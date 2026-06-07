@@ -23,7 +23,7 @@ export async function buildCustomerContext(customerId: string): Promise<Customer
 
   return {
     name: customer.name ?? '',
-    lastVisit: lastAppt ? toIso(lastAppt.startTime) : null,
+    lastVisit: lastAppt ? lastAppt.startTime : null,
     appointmentCount: customer.appointmentCount ?? 0,
     preferredTime: customer.preferredTimeOfDay ?? 'ANY',
     lastRecoveryOutcome: (lastHistory?.outcome as CallOutcome) ?? null,

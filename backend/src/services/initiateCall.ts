@@ -3,9 +3,6 @@ import { fonioClient } from '../lib/fonio';
 import { buildCustomerContext } from './buildCustomerContext';
 import { Appointment } from '../types';
 
-const DEFAULT_PROMPT =
-  'You are a friendly dental clinic assistant calling to offer a newly available appointment slot.';
-
 export async function initiateCall(
   jobId: string,
   candidateIndex: number,
@@ -28,20 +25,14 @@ export async function initiateCall(
 
   console.log(`[initiateCall] Candidate — name=${candidate.customerName} phone=${candidate.customerPhone} retryCount=${candidate.retryCount ?? 0}`);
 
-  const settingsDoc = await col.settings.doc('default').get();
-  const settings = settingsDoc.data() ?? {};
-  const systemPrompt = settings.aiSystemPrompt || DEFAULT_PROMPT;
+  // const settingsDoc = await col.settings.doc('default').get();
+  // const settings = settingsDoc.data() ?? {};
+  // const systemPrompt = settings.aiSystemPrompt || DEFAULT_PROMPT;
 
   const customerCtx = await buildCustomerContext(candidate.customerId);
   console.log(`[initiateCall] Customer context — lastVisit=${customerCtx.lastVisit} appointmentCount=${customerCtx.appointmentCount}`);
 
-  const appointmentTime = toIso(appointment.startTime);
-  const fullPrompt = [
-    systemPrompt,
-    `Appointment type: ${appointment.appointmentTypeName}`,
-    `Date/time: ${appointmentTime}`,
-    `Location: ${appointment.locationName}`,
-  ].join('\n');
+  const appointmentTime = appointment.startTime;
 
   const attemptNumber = (candidate.retryCount ?? 0) + 1;
   const attemptRef = col.callAttempts.doc();
@@ -68,15 +59,12 @@ export async function initiateCall(
     toNumber: candidate.customerPhone,
     agentId: process.env.FONIO_AGENT_ID,
     context: {
-      callAttemptId,
       customerName: candidate.customerName,
       lastVisit: customerCtx.lastVisit,
-      appointmentCount: customerCtx.appointmentCount,
-      lastRecoveryOutcome: customerCtx.lastRecoveryOutcome,
+      preferredTime: customerCtx.preferredTime,
       appointmentType: appointment.appointmentTypeName,
       appointmentTime,
-      location: appointment.locationName,
-      prompt: fullPrompt
+      notes: appointment.notes
     },
   };
   console.log(`[initiateCall] Sending to Fonio — toNumber=${payload.toNumber} fromNumber=${payload.fromNumber} agentId=${payload.agentId}`);
