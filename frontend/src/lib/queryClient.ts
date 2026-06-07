@@ -44,4 +44,8 @@ export const queryKeys = {
     outcomes: ['analytics', 'outcomes'] as const,
   },
   settings: ['settings'] as const,
+  personas: {
+    all: ['personas'] as const,
+    detail: (id: string) => ['personas', id] as const,
+  },
 };

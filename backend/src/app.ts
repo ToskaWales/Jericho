@@ -10,6 +10,7 @@ import waitlistRouter from './routes/waitlist';
 import recoveryJobsRouter from './routes/recoveryJobs';
 import analyticsRouter from './routes/analytics';
 import settingsRouter from './routes/settings';
+import personasRouter from './routes/personas';
 import webhooksRouter from './routes/webhooks';
 
 export const app = express();
@@ -25,6 +26,7 @@ app.use('/api/waitlist',      waitlistRouter);
 app.use('/api/recovery-jobs', recoveryJobsRouter);
 app.use('/api/analytics',     analyticsRouter);
 app.use('/api/settings',      settingsRouter);
+app.use('/api/personas',      personasRouter);
 app.use('/api/webhooks',      webhooksRouter);
 
 app.use(errorHandler);

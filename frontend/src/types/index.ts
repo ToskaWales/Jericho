@@ -151,6 +151,44 @@ export interface CallAttempt {
   customerResponse?: string | null;
 }
 
+export type PersonalityTrait =
+  | 'warm' | 'professional' | 'empathetic'
+  | 'energetic' | 'calm' | 'friendly' | 'direct';
+
+export interface PersonaStats {
+  totalCalls: number;
+  acceptedCalls: number;
+  acceptanceRate: number;
+}
+
+export interface Persona {
+  id: string;
+  name: string;
+  role: string;
+  personality: PersonalityTrait[];
+  objective: string;
+  dos: string[];
+  donts: string[];
+  closingStyle: string;
+  assignedTypeIds: string[];
+  isActive: boolean;
+  generatedPrompt: string;
+  stats: PersonaStats;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePersonaPayload {
+  name: string;
+  role: string;
+  personality: PersonalityTrait[];
+  objective: string;
+  dos: string[];
+  donts: string[];
+  closingStyle: string;
+  assignedTypeIds: string[];
+}
+
 export interface Settings {
   id: string;
   aiSystemPrompt: string;

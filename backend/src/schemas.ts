@@ -76,6 +76,23 @@ export const UpdateSettingsSchema = z.object({
   }).optional(),
 });
 
+const PersonalityTraitEnum = z.enum([
+  'warm', 'professional', 'empathetic', 'energetic', 'calm', 'friendly', 'direct',
+]);
+
+export const CreatePersonaSchema = z.object({
+  name:            z.string().min(1).max(40),
+  role:            z.string().min(1).max(80),
+  personality:     z.array(PersonalityTraitEnum).min(1).max(5),
+  objective:       z.string().min(1).max(300),
+  dos:             z.array(z.string().min(1).max(120)).max(8).default([]),
+  donts:           z.array(z.string().min(1).max(120)).max(8).default([]),
+  closingStyle:    z.string().min(1).max(200),
+  assignedTypeIds: z.array(z.string()).default([]),
+});
+
+export const UpdatePersonaSchema = CreatePersonaSchema.partial();
+
 // Cal.com sends this for BOOKING_CREATED, BOOKING_CANCELLED, BOOKING_RESCHEDULED
 export const CalcomWebhookSchema = z.object({
   triggerEvent: z.string(),

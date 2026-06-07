@@ -1,4 +1,4 @@
-import { col, now, toIso } from '../lib/firebase';
+import { col, now, toIso, db } from '../lib/firebase';
 import { resolveTranscript } from '../lib/formatTranscript';
 import { initiateCall } from './initiateCall';
 import { createCalcomBooking } from './createCalcomBooking';
@@ -106,6 +106,28 @@ export async function processOutcome(webhook: FonioWebhookPayload): Promise<void
     duration: webhook.duration ?? null,
   });
   console.log(`${ts()} [processOutcome] Attempt doc marked COMPLETED (duration=${webhook.duration ?? '?'}s transcript=${transcript ? 'yes' : 'none'})`);
+
+  // ── Persona stats attribution ───────────────────────────────────────────────
+  const personaId = attempt.personaId as string | null;
+  if (personaId) {
+    const personaRef = col.personas.doc(personaId);
+    db.runTransaction(async (tx) => {
+      const personaDoc = await tx.get(personaRef);
+      if (!personaDoc.exists) return;
+      const current = personaDoc.data()!;
+      const totalCalls = ((current.stats?.totalCalls as number) ?? 0) + 1;
+      const acceptedCalls = ((current.stats?.acceptedCalls as number) ?? 0) +
+        (outcome === 'ACCEPTED' ? 1 : 0);
+      tx.update(personaRef, {
+        'stats.totalCalls': totalCalls,
+        'stats.acceptedCalls': acceptedCalls,
+        'stats.acceptanceRate': totalCalls > 0
+          ? Math.round((acceptedCalls / totalCalls) * 1000) / 10
+          : 0,
+        updatedAt: now(),
+      });
+    }).catch((err) => console.error(`${ts()} [processOutcome] Persona stats update failed:`, err));
+  }
 
   // ── Load recovery job ───────────────────────────────────────────────────────
   const jobDoc = await col.recoveryJobs.doc(attempt.recoveryJobId).get();

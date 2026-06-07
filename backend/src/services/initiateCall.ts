@@ -31,9 +31,42 @@ export async function initiateCall(
   const attemptNumber = retryCount + 1;
   console.log(`${ts()} [initiateCall] Candidate ${candidateIndex + 1}/${job.candidates.length} — name="${candidate.customerName}" phone=${candidate.customerPhone} attemptNumber=${attemptNumber} (retryCount=${retryCount})`);
 
-  // const settingsDoc = await col.settings.doc('default').get();
-  // const settings = settingsDoc.data() ?? {};
-  // const systemPrompt = settings.aiSystemPrompt || DEFAULT_PROMPT;
+  // Resolve active persona; fall back to settings.aiSystemPrompt then a hard default.
+  const activeSnap = await col.personas.where('isActive', '==', true).limit(1).get();
+  let activePersonaId: string | null = null;
+  let systemPrompt: string | undefined;
+
+  if (!activeSnap.empty) {
+    const persona = activeSnap.docs[0].data();
+    activePersonaId = activeSnap.docs[0].id;
+    const assignedTypes = (persona.assignedTypeIds as string[]) ?? [];
+    const typeMatches =
+      assignedTypes.length === 0 ||
+      assignedTypes.includes(appointment.appointmentTypeId ?? '');
+
+    if (typeMatches) {
+      systemPrompt = persona.generatedPrompt as string;
+    } else {
+      // Look for a type-specific override persona.
+      const typeSnap = await col.personas
+        .where('assignedTypeIds', 'array-contains', appointment.appointmentTypeId ?? '')
+        .limit(1)
+        .get();
+      if (!typeSnap.empty) {
+        activePersonaId = typeSnap.docs[0].id;
+        systemPrompt = typeSnap.docs[0].data().generatedPrompt as string;
+      } else {
+        systemPrompt = persona.generatedPrompt as string;
+      }
+    }
+  }
+
+  if (!systemPrompt) {
+    const settingsDoc = await col.settings.doc('default').get();
+    const settings = settingsDoc.data() ?? {};
+    systemPrompt = (settings.aiSystemPrompt as string) ||
+      'You are a friendly dental clinic assistant calling to offer a newly available appointment slot. Be warm, concise, and professional.';
+  }
 
   const customerCtx = await buildCustomerContext(candidate.customerId);
 
@@ -51,6 +84,7 @@ export async function initiateCall(
     fonioCallId: callAttemptId,
     status: 'INITIATED',
     attemptNumber,
+    personaId: activePersonaId,
     initiatedAt: now(),
   });
   console.log(`${ts()} [initiateCall] Attempt doc created — attemptId=${callAttemptId}`);
@@ -60,6 +94,7 @@ export async function initiateCall(
     fromNumber: process.env.FONIO_PHONE_NUMBER,
     toNumber: candidate.customerPhone,
     agentId: process.env.FONIO_AGENT_ID,
+    systemPrompt,
     context: {
       customerName: candidate.customerName,
       lastVisit: customerCtx.lastVisit,

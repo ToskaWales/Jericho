@@ -5,6 +5,8 @@ import type {
   RecoveryJob,
   Customer,
   Settings,
+  Persona,
+  CreatePersonaPayload,
   AnalyticsOverview,
   AnalyticsTrend,
   OutcomeDistribution,
@@ -94,4 +96,18 @@ export const settingsApi = {
   get: () => apiClient.get<Settings>('/settings').then((r) => r.data),
   update: (data: Partial<Settings>) =>
     apiClient.put<Settings>('/settings', data).then((r) => r.data),
+};
+
+// ─── Personas ─────────────────────────────────────────────────────────────────
+
+export const personasApi = {
+  list: () => apiClient.get<{ data: Persona[] }>('/personas').then((r) => r.data),
+  get: (id: string) => apiClient.get<Persona>(`/personas/${id}`).then((r) => r.data),
+  create: (data: CreatePersonaPayload) =>
+    apiClient.post<Persona>('/personas', data).then((r) => r.data),
+  update: (id: string, data: Partial<CreatePersonaPayload>) =>
+    apiClient.patch<Persona>(`/personas/${id}`, data).then((r) => r.data),
+  delete: (id: string) => apiClient.delete(`/personas/${id}`),
+  activate: (id: string) =>
+    apiClient.post<Persona>(`/personas/${id}/activate`).then((r) => r.data),
 };

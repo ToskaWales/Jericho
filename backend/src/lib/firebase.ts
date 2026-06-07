@@ -30,6 +30,7 @@ export const col = {
   callAttempts:           db.collection('callAttempts'),
   contactHistory:         db.collection('customerContactHistory'),
   settings:               db.collection('settings'),
+  personas:               db.collection('personas'),
 };
 
 export const now = () => Timestamp.now();

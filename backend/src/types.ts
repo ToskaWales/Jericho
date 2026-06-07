@@ -167,6 +167,33 @@ export interface Settings {
   updatedAt: string;
 }
 
+export type PersonalityTrait =
+  | 'warm' | 'professional' | 'empathetic'
+  | 'energetic' | 'calm' | 'friendly' | 'direct';
+
+export interface PersonaStats {
+  totalCalls: number;
+  acceptedCalls: number;
+  acceptanceRate: number;
+}
+
+export interface Persona {
+  id: string;
+  name: string;
+  role: string;
+  personality: PersonalityTrait[];
+  objective: string;
+  dos: string[];
+  donts: string[];
+  closingStyle: string;
+  assignedTypeIds: string[];
+  isActive: boolean;
+  generatedPrompt: string;
+  stats: PersonaStats;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AnalyticsOverview {
   recoveryRate: number;
   totalRecovered: number;

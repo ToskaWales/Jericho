@@ -8,6 +8,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import dotenv from 'dotenv';
 dotenv.config();
+import { buildPersonaPrompt } from './src/lib/buildPersonaPrompt';
+import type { PersonalityTrait } from './src/types';
 
 if (admin.apps.length === 0) {
   const saPath = path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? './service-account.json');
@@ -50,6 +52,10 @@ const CUST = {
   klaus:     'cust-klaus',
   elisabeth: 'cust-elisabeth',
   michael:   'cust-michael',
+  laura:     'cust-laura',
+  stefan:    'cust-stefan',
+  petra:     'cust-petra',
+  david:     'cust-david',
 };
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -58,7 +64,7 @@ async function main() {
   console.log('🗑  Clearing all collections…');
   const collections = [
     'customers', 'appointments', 'appointmentTypes', 'locations',
-    'waitlist', 'recoveryJobs', 'callAttempts', 'customerContactHistory', 'settings',
+    'waitlist', 'recoveryJobs', 'callAttempts', 'customerContactHistory', 'settings', 'personas',
   ];
   for (const c of collections) { await clearCollection(c); console.log(`   ✓ ${c}`); }
 
@@ -143,6 +149,34 @@ async function main() {
       isActive: true, appointmentCount: 4, lastVisitDate: '2025-12-10',
       createdAt: ts('2024-10-01T08:00:00Z'), updatedAt: ts('2025-12-10T11:00:00Z'),
     },
+    {
+      id: CUST.laura, name: 'Laura Hoffmann', phone: '+491632421661',
+      email: 'laura.hoffmann@email.at', locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+      preferredTimeOfDay: 'MORNING', preferredAppointmentTypeIds: [TYPE.whitening, TYPE.cleaning],
+      isActive: true, appointmentCount: 6, lastVisitDate: '2026-04-08',
+      createdAt: ts('2024-03-01T08:00:00Z'), updatedAt: ts('2026-04-08T09:30:00Z'),
+    },
+    {
+      id: CUST.stefan, name: 'Stefan Braun', phone: '+491632421661',
+      email: 'stefan.braun@email.at', locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+      preferredTimeOfDay: 'AFTERNOON', preferredAppointmentTypeIds: [TYPE.checkup],
+      isActive: true, appointmentCount: 2, lastVisitDate: '2025-11-20',
+      createdAt: ts('2025-09-01T08:00:00Z'), updatedAt: ts('2025-11-20T14:00:00Z'),
+    },
+    {
+      id: CUST.petra, name: 'Petra König', phone: '+491632421661',
+      email: 'petra.koenig@email.at', locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+      preferredTimeOfDay: 'MORNING', preferredAppointmentTypeIds: [TYPE.cleaning, TYPE.checkup, TYPE.whitening],
+      isActive: true, appointmentCount: 18, lastVisitDate: '2026-05-20',
+      createdAt: ts('2022-06-01T08:00:00Z'), updatedAt: ts('2026-05-20T09:00:00Z'),
+    },
+    {
+      id: CUST.david, name: 'David Zimmermann', phone: '+491632421661',
+      email: 'd.zimmermann@email.at', locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+      preferredTimeOfDay: 'MORNING', preferredAppointmentTypeIds: [TYPE.checkup, TYPE.cleaning],
+      isActive: true, appointmentCount: 5, lastVisitDate: '2026-03-30',
+      createdAt: ts('2024-01-01T08:00:00Z'), updatedAt: ts('2026-03-30T10:00:00Z'),
+    },
   ];
   customers.forEach(({ id, ...data }) => batch1.set(ref('customers', id), data));
 
@@ -179,6 +213,15 @@ async function main() {
     status: 'CANCELLED', cancelledAt: ts('2026-07-05T11:00:00Z'), cancelledBy: 'patient',
     price: 150,
     createdAt: ts('2026-05-25T09:00:00Z'), updatedAt: ts('2026-07-05T11:00:00Z'),
+  });
+  batch2.set(ref('appointments', 'appt-cancelled-3'), {
+    customerId: CUST.laura, customerName: 'Laura Hoffmann', customerPhone: '+491632421661',
+    appointmentTypeId: TYPE.whitening, appointmentTypeName: 'Teeth Whitening',
+    locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+    startTime: ts('2026-07-22T14:00:00Z'), endTime: ts('2026-07-22T15:00:00Z'),
+    status: 'CANCELLED', cancelledAt: ts('2026-07-10T10:00:00Z'), cancelledBy: 'patient',
+    price: 280,
+    createdAt: ts('2026-06-01T10:00:00Z'), updatedAt: ts('2026-07-10T10:00:00Z'),
   });
 
   // Future BOOKED — candidates for recovery (wantsEarlierSlot: true)
@@ -246,6 +289,38 @@ async function main() {
     status: 'BOOKED', price: 120, wantsEarlierSlot: true,
     createdAt: ts('2026-06-01T18:00:00Z'), updatedAt: ts('2026-06-01T18:00:00Z'),
   });
+  batch2.set(ref('appointments', 'appt-laura-booked'), {
+    customerId: CUST.laura, customerName: 'Laura Hoffmann', customerPhone: '+491632421661',
+    appointmentTypeId: TYPE.whitening, appointmentTypeName: 'Teeth Whitening',
+    locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+    startTime: ts('2026-10-05T10:00:00Z'), endTime: ts('2026-10-05T11:00:00Z'),
+    status: 'BOOKED', price: 280, wantsEarlierSlot: true,
+    createdAt: ts('2026-06-10T10:00:00Z'), updatedAt: ts('2026-06-10T10:00:00Z'),
+  });
+  batch2.set(ref('appointments', 'appt-stefan-booked'), {
+    customerId: CUST.stefan, customerName: 'Stefan Braun', customerPhone: '+491632421661',
+    appointmentTypeId: TYPE.checkup, appointmentTypeName: 'Comprehensive Checkup',
+    locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+    startTime: ts('2026-09-25T14:00:00Z'), endTime: ts('2026-09-25T14:45:00Z'),
+    status: 'BOOKED', price: 150, wantsEarlierSlot: true,
+    createdAt: ts('2026-06-12T14:00:00Z'), updatedAt: ts('2026-06-12T14:00:00Z'),
+  });
+  batch2.set(ref('appointments', 'appt-petra-booked'), {
+    customerId: CUST.petra, customerName: 'Petra König', customerPhone: '+491632421661',
+    appointmentTypeId: TYPE.cleaning, appointmentTypeName: 'Professional Cleaning',
+    locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+    startTime: ts('2026-08-28T09:00:00Z'), endTime: ts('2026-08-28T09:30:00Z'),
+    status: 'BOOKED', price: 120, wantsEarlierSlot: true,
+    createdAt: ts('2026-06-15T09:00:00Z'), updatedAt: ts('2026-06-15T09:00:00Z'),
+  });
+  batch2.set(ref('appointments', 'appt-david-booked'), {
+    customerId: CUST.david, customerName: 'David Zimmermann', customerPhone: '+491632421661',
+    appointmentTypeId: TYPE.checkup, appointmentTypeName: 'Comprehensive Checkup',
+    locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+    startTime: ts('2026-09-08T09:00:00Z'), endTime: ts('2026-09-08T09:45:00Z'),
+    status: 'BOOKED', price: 150, wantsEarlierSlot: true,
+    createdAt: ts('2026-06-18T09:00:00Z'), updatedAt: ts('2026-06-18T09:00:00Z'),
+  });
 
   // Historical COMPLETED (give customers visit history)
   batch2.set(ref('appointments', 'appt-sophie-h1'), {
@@ -288,9 +363,41 @@ async function main() {
     status: 'COMPLETED', price: 150,
     createdAt: ts('2026-03-01T09:00:00Z'), updatedAt: ts('2026-05-03T09:45:00Z'),
   });
+  batch2.set(ref('appointments', 'appt-petra-h1'), {
+    customerId: CUST.petra, customerName: 'Petra König', customerPhone: '+491632421661',
+    appointmentTypeId: TYPE.whitening, appointmentTypeName: 'Teeth Whitening',
+    locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+    startTime: ts('2025-11-15T09:00:00Z'), endTime: ts('2025-11-15T10:00:00Z'),
+    status: 'COMPLETED', price: 280,
+    createdAt: ts('2025-09-01T09:00:00Z'), updatedAt: ts('2025-11-15T10:00:00Z'),
+  });
+  batch2.set(ref('appointments', 'appt-petra-h2'), {
+    customerId: CUST.petra, customerName: 'Petra König', customerPhone: '+491632421661',
+    appointmentTypeId: TYPE.cleaning, appointmentTypeName: 'Professional Cleaning',
+    locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+    startTime: ts('2026-05-20T09:00:00Z'), endTime: ts('2026-05-20T09:30:00Z'),
+    status: 'COMPLETED', price: 120,
+    createdAt: ts('2026-03-15T09:00:00Z'), updatedAt: ts('2026-05-20T09:30:00Z'),
+  });
+  batch2.set(ref('appointments', 'appt-laura-h1'), {
+    customerId: CUST.laura, customerName: 'Laura Hoffmann', customerPhone: '+491632421661',
+    appointmentTypeId: TYPE.cleaning, appointmentTypeName: 'Professional Cleaning',
+    locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+    startTime: ts('2026-04-08T09:00:00Z'), endTime: ts('2026-04-08T09:30:00Z'),
+    status: 'COMPLETED', price: 120,
+    createdAt: ts('2026-02-10T09:00:00Z'), updatedAt: ts('2026-04-08T09:30:00Z'),
+  });
+  batch2.set(ref('appointments', 'appt-david-h1'), {
+    customerId: CUST.david, customerName: 'David Zimmermann', customerPhone: '+491632421661',
+    appointmentTypeId: TYPE.checkup, appointmentTypeName: 'Comprehensive Checkup',
+    locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+    startTime: ts('2026-03-30T10:00:00Z'), endTime: ts('2026-03-30T10:45:00Z'),
+    status: 'COMPLETED', price: 150,
+    createdAt: ts('2026-01-15T10:00:00Z'), updatedAt: ts('2026-03-30T10:45:00Z'),
+  });
 
   await batch2.commit();
-  console.log('✓ appointments (2 cancelled, 8 booked, 5 historical)');
+  console.log('✓ appointments (3 cancelled, 12 booked, 9 historical)');
 
   // ── Waitlist ───────────────────────────────────────────────────────────────
   const batch3 = db.batch();
@@ -318,11 +425,55 @@ async function main() {
       preferredTimeOfDay: 'MORNING', manualPriorityBoost: 0, status: 'ACTIVE', consentGiven: true,
       joinedAt: ts('2026-06-02T09:00:00Z'), updatedAt: ts('2026-06-02T09:00:00Z'),
     },
+    {
+      id: 'wl-petra', customerId: CUST.petra, customerName: 'Petra König', customerPhone: '+491632421661',
+      appointmentTypeId: TYPE.cleaning, appointmentTypeName: 'Professional Cleaning',
+      locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+      preferredTimeOfDay: 'MORNING', manualPriorityBoost: 8, status: 'ACTIVE', consentGiven: true,
+      joinedAt: ts('2026-06-05T09:00:00Z'), updatedAt: ts('2026-06-05T09:00:00Z'),
+      notes: 'Long-standing patient — high priority. Flexible on exact time.',
+    },
+    {
+      id: 'wl-laura', customerId: CUST.laura, customerName: 'Laura Hoffmann', customerPhone: '+491632421661',
+      appointmentTypeId: TYPE.whitening, appointmentTypeName: 'Teeth Whitening',
+      locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+      preferredTimeOfDay: 'MORNING', manualPriorityBoost: 0, status: 'ACTIVE', consentGiven: true,
+      joinedAt: ts('2026-06-08T10:00:00Z'), updatedAt: ts('2026-06-08T10:00:00Z'),
+    },
+    {
+      id: 'wl-david', customerId: CUST.david, customerName: 'David Zimmermann', customerPhone: '+491632421661',
+      appointmentTypeId: TYPE.checkup, appointmentTypeName: 'Comprehensive Checkup',
+      locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+      preferredTimeOfDay: 'MORNING', manualPriorityBoost: 3, status: 'ACTIVE', consentGiven: true,
+      joinedAt: ts('2026-06-10T09:00:00Z'), updatedAt: ts('2026-06-10T09:00:00Z'),
+      notes: 'Requested earlier slot due to work travel schedule',
+    },
+    {
+      id: 'wl-hans', customerId: CUST.hans, customerName: 'Hans Bauer', customerPhone: '+491632421661',
+      appointmentTypeId: TYPE.cleaning, appointmentTypeName: 'Professional Cleaning',
+      locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+      preferredTimeOfDay: 'AFTERNOON', manualPriorityBoost: 0, status: 'ACTIVE', consentGiven: true,
+      joinedAt: ts('2026-06-12T14:00:00Z'), updatedAt: ts('2026-06-12T14:00:00Z'),
+    },
+    {
+      id: 'wl-stefan', customerId: CUST.stefan, customerName: 'Stefan Braun', customerPhone: '+491632421661',
+      appointmentTypeId: TYPE.checkup, appointmentTypeName: 'Comprehensive Checkup',
+      locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+      preferredTimeOfDay: 'AFTERNOON', manualPriorityBoost: 0, status: 'ACTIVE', consentGiven: true,
+      joinedAt: ts('2026-06-14T14:00:00Z'), updatedAt: ts('2026-06-14T14:00:00Z'),
+    },
+    {
+      id: 'wl-michael', customerId: CUST.michael, customerName: 'Michael Schwarz', customerPhone: '+491632421661',
+      appointmentTypeId: TYPE.cleaning, appointmentTypeName: 'Professional Cleaning',
+      locationId: LOC, locationName: 'Jericho Dental — Vienna Central',
+      preferredTimeOfDay: 'ANY', manualPriorityBoost: 0, status: 'ACTIVE', consentGiven: true,
+      joinedAt: ts('2026-06-15T11:00:00Z'), updatedAt: ts('2026-06-15T11:00:00Z'),
+    },
   ];
   waitlistEntries.forEach(({ id, ...data }) => batch3.set(ref('waitlist', id), data));
 
   await batch3.commit();
-  console.log('✓ waitlist');
+  console.log('✓ waitlist (9 entries)');
 
   // ── Recovery jobs & call attempts (demo transcripts) ───────────────────────
   const batch4 = db.batch();
@@ -444,16 +595,95 @@ async function main() {
   await batch4.commit();
   console.log('✓ recovery jobs & call attempts');
 
+  // ── Personas ───────────────────────────────────────────────────────────────
+  const personaBatch = db.batch();
+
+  const mayaData = {
+    name: 'Maya', role: 'patient care coordinator',
+    personality: ['warm', 'empathetic', 'friendly'] as PersonalityTrait[],
+    objective: 'Warmly offer the patient a newly available appointment slot, understanding any scheduling concerns they may have.',
+    dos: [
+      "Use the patient's first name throughout",
+      'Acknowledge if rescheduling is inconvenient',
+      'Express genuine care for their dental health',
+    ],
+    donts: [
+      'Rush the conversation',
+      'Sound scripted or robotic',
+      'Lead with clinical details before building rapport',
+    ],
+    closingStyle: 'Thank the patient sincerely, confirm the appointment details slowly and clearly, and wish them a great day.',
+    assignedTypeIds: [] as string[], isActive: true,
+    stats: { totalCalls: 0, acceptedCalls: 0, acceptanceRate: 0 },
+  };
+  personaBatch.set(db.collection('personas').doc('persona-maya'), {
+    ...mayaData,
+    generatedPrompt: buildPersonaPrompt(mayaData),
+    createdAt: now(), updatedAt: now(),
+  });
+
+  const alexData = {
+    name: 'Alex', role: 'dental receptionist',
+    personality: ['professional', 'direct', 'calm'] as PersonalityTrait[],
+    objective: "Efficiently communicate the availability of an appointment slot and confirm the patient's preference to take it.",
+    dos: [
+      'Be clear and concise',
+      'Confirm appointment details precisely',
+      'Offer a straightforward yes/no path forward',
+    ],
+    donts: [
+      'Over-explain or repeat information unnecessarily',
+      'Be overly casual',
+      'Drag out the conversation',
+    ],
+    closingStyle: 'Confirm the appointment time and date clearly, provide any next steps, and end the call professionally.',
+    assignedTypeIds: [] as string[], isActive: false,
+    stats: { totalCalls: 0, acceptedCalls: 0, acceptanceRate: 0 },
+  };
+  personaBatch.set(db.collection('personas').doc('persona-alex'), {
+    ...alexData,
+    generatedPrompt: buildPersonaPrompt(alexData),
+    createdAt: now(), updatedAt: now(),
+  });
+
+  const jordanData = {
+    name: 'Jordan', role: 'dental receptionist',
+    personality: ['friendly', 'energetic', 'warm'] as PersonalityTrait[],
+    objective: 'Enthusiastically connect with the patient and make taking the appointment feel exciting and easy.',
+    dos: [
+      'Use upbeat, positive language',
+      'Express genuine excitement about helping them',
+      'Make the patient feel valued and appreciated',
+    ],
+    donts: [
+      'Sound desperate or pushy',
+      'Use negative or clinical framing',
+      'Overwhelm with too much information at once',
+    ],
+    closingStyle: 'End on a high note, express enthusiasm about seeing them, and leave the patient feeling positive about the visit.',
+    assignedTypeIds: [] as string[], isActive: false,
+    stats: { totalCalls: 0, acceptedCalls: 0, acceptanceRate: 0 },
+  };
+  personaBatch.set(db.collection('personas').doc('persona-jordan'), {
+    ...jordanData,
+    generatedPrompt: buildPersonaPrompt(jordanData),
+    createdAt: now(), updatedAt: now(),
+  });
+
+  await personaBatch.commit();
+  console.log('✓ personas (Maya active, Alex, Jordan)');
+
   console.log('\n✅ Seed complete!\n');
   console.log('Summary:');
-  console.log('  1  location');
-  console.log('  3  appointment types (Cleaning, Checkup, Whitening)');
-  console.log('  8  customers');
-  console.log(' 15  appointments (2 cancelled, 8 booked, 5 historical)');
-  console.log('  3  waitlist entries');
-  console.log('  2  recovery jobs (1 SUCCESS with transcript, 1 FAILED with mixed attempts)');
-  console.log('  4  call attempts (2 with transcripts, 2 without)');
-  console.log('  1  settings doc');
+  console.log('   1  location');
+  console.log('   3  appointment types (Cleaning, Checkup, Whitening)');
+  console.log('  12  customers');
+  console.log('  24  appointments (3 cancelled, 12 booked, 9 historical)');
+  console.log('   9  waitlist entries');
+  console.log('   2  recovery jobs (1 SUCCESS with transcript, 1 FAILED with mixed attempts)');
+  console.log('   4  call attempts (2 with transcripts, 2 without)');
+  console.log('   1  settings doc');
+  console.log('   3  personas (Maya active, Alex, Jordan)');
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });
