@@ -177,6 +177,8 @@ function convertFirestoreJob(id: string, raw: Record<string, unknown>): Recovery
         callAttemptIds: (candidate.callAttemptIds as string[]) ?? [],
         lastAttemptAt: candidate.lastAttemptAt ? convertTimestamp(candidate.lastAttemptAt) : undefined,
         contactedAt: candidate.contactedAt ? convertTimestamp(candidate.contactedAt) : undefined,
+        reachabilityScore: candidate.reachabilityScore as number | undefined,
+        aiRankingReason: candidate.aiRankingReason as string | undefined,
       };
     }),
     createdAt: convertTimestamp(raw.createdAt),

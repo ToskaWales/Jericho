@@ -1,7 +1,7 @@
 import { col, now, toIso } from '../lib/firebase';
-import { rankCandidates } from './rankCandidates';
+import { rankCandidatesAI, CandidateInput } from './rankCandidatesAI';
 import { initiateCall } from './initiateCall';
-import { Appointment, CallOutcome } from '../types';
+import { Appointment, Customer, ContactHistoryEntry } from '../types';
 
 export async function createRecoveryJob(appointmentId: string): Promise<void> {
   console.log(`[createRecoveryJob] START — appointmentId=${appointmentId}`);
@@ -29,7 +29,8 @@ export async function createRecoveryJob(appointmentId: string): Promise<void> {
   console.log(`[createRecoveryJob] Eligible after time filter — ${eligible.length} candidates`);
   eligible.forEach((a) => console.log(`  - ${a.customerName} (${a.id}) scheduled ${toIso(a.startTime).slice(0, 10)}`));
 
-  const contactHistory: Record<string, { lastOutcome: CallOutcome | null; noAnswerStreak: number }> = {};
+  // ── Fetch full contact history per candidate ────────────────────────────────
+  const historyByCustomer: Record<string, Pick<ContactHistoryEntry, 'outcome' | 'createdAt'>[]> = {};
   if (eligible.length > 0) {
     const customerIds = [...new Set(eligible.map((a) => a.customerId))];
     const chunks: string[][] = [];
@@ -38,40 +39,70 @@ export async function createRecoveryJob(appointmentId: string): Promise<void> {
     console.log(`[createRecoveryJob] Fetching contact history for ${customerIds.length} customers in ${chunks.length} chunk(s)`);
 
     for (const chunk of chunks) {
-      // No orderBy here — composite index not set up. Sort in memory.
-      const histSnap = await col.contactHistory
-        .where('customerId', 'in', chunk)
-        .get();
-
-      const sorted = histSnap.docs.sort((a, b) => {
-        const aMs = a.data().createdAt?.toDate?.()?.getTime() ?? 0;
-        const bMs = b.data().createdAt?.toDate?.()?.getTime() ?? 0;
-        return bMs - aMs;
-      });
-
-      for (const doc of sorted) {
+      const histSnap = await col.contactHistory.where('customerId', 'in', chunk).get();
+      for (const doc of histSnap.docs) {
         const d = doc.data();
         const cid = d.customerId as string;
-        if (!contactHistory[cid]) {
-          contactHistory[cid] = { lastOutcome: d.outcome as CallOutcome, noAnswerStreak: 0 };
-        }
-        if (d.outcome === 'NO_ANSWER' || d.outcome === 'VOICEMAIL') {
-          contactHistory[cid].noAnswerStreak++;
-        }
+        if (!historyByCustomer[cid]) historyByCustomer[cid] = [];
+        historyByCustomer[cid].push({
+          outcome: d.outcome,
+          createdAt: d.createdAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
+        });
       }
     }
-    console.log(`[createRecoveryJob] Contact history loaded — ${Object.keys(contactHistory).length} customers have history`);
+
+    // Sort each customer's history newest-first (required by reachability score)
+    for (const cid of Object.keys(historyByCustomer)) {
+      historyByCustomer[cid].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    console.log(`[createRecoveryJob] Contact history loaded — ${Object.keys(historyByCustomer).length} customers have history`);
   }
 
-  const ranked = rankCandidates(eligible, cancelledSlotTime, contactHistory);
-  console.log(`[createRecoveryJob] Ranked candidates:`);
-  ranked.forEach((c, i) => console.log(`  [${i}] ${c.customerName} score=${c.score} originalAppointmentId=${c.originalAppointmentId}`));
+  // ── Fetch customer profiles in batch ───────────────────────────────────────
+  const customerMap: Record<string, Customer> = {};
+  if (eligible.length > 0) {
+    const customerIds = [...new Set(eligible.map((a) => a.customerId))];
+    const chunks: string[][] = [];
+    for (let i = 0; i < customerIds.length; i += 30) chunks.push(customerIds.slice(i, i + 30));
+
+    for (const chunk of chunks) {
+      const custSnap = await col.customers.where('__name__', 'in', chunk).get();
+      for (const doc of custSnap.docs) {
+        customerMap[doc.id] = { id: doc.id, ...doc.data() } as Customer;
+      }
+    }
+    console.log(`[createRecoveryJob] Customer profiles loaded — ${Object.keys(customerMap).length} found`);
+  }
+
+  // ── Build candidate inputs and AI-rank ─────────────────────────────────────
+  const slotTime = cancelledSlotTime;
+  const candidateInputs: CandidateInput[] = eligible.map((a) => ({
+    appointment: a,
+    customer: customerMap[a.customerId],
+    historyEntries: historyByCustomer[a.customerId] ?? [],
+    daysSaved: (new Date(toIso(a.startTime)).getTime() - slotTime.getTime()) / (1000 * 60 * 60 * 24),
+  }));
+
+  const ranked = await rankCandidatesAI(
+    candidateInputs,
+    slotTime,
+    appt.appointmentTypeName,
+    appt.locationName,
+    appt.price,
+  );
+
+  console.log(`[createRecoveryJob] Ranked candidates (top ${ranked.length}):`);
+  ranked.forEach((c, i) =>
+    console.log(`  [${i}] ${c.customerName} score=${c.score} reachability=${c.reachabilityScore} reason="${c.aiRankingReason}"`)
+  );
 
   const candidates = ranked.map((c) => ({
     customerId: c.customerId,
     customerName: c.customerName,
     customerPhone: c.customerPhone,
     score: c.score,
+    reachabilityScore: c.reachabilityScore,
+    aiRankingReason: c.aiRankingReason,
     originalAppointmentId: c.originalAppointmentId,
     status: 'PENDING',
     retryCount: 0,

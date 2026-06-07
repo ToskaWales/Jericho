@@ -99,6 +99,8 @@ export interface RecoveryCandidate {
   customerName: string;
   customerPhone: string;
   score: number;
+  reachabilityScore?: number;
+  aiRankingReason?: string;
   status: CandidateStatus;
   retryCount: number;
   callAttemptIds: string[];
