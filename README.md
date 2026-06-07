@@ -29,12 +29,37 @@ while respecting patient preferences and contact history.
 
 ## Demo
 
-- Live demo: run locally, see below
-- Screenshots / video: `<link>`
+Jericho is live — open the dashboard in your browser:
+
+**https://jericho-dashboard.artemy.dev**
+
+| | URL |
+|---|---|
+| **App** | https://jericho-dashboard.artemy.dev |
+| **API** | https://jericho.artemy.dev/api |
 
 ---
 
-## Getting started
+## Deployment
+
+| Layer | Host | URL |
+|---|---|---|
+| Frontend | Vercel (custom domain) | https://jericho-dashboard.artemy.dev |
+| Backend | DigitalOcean App Platform | https://jericho.artemy.dev |
+| Database | Firebase Firestore | — |
+
+**Production webhooks** (point Cal.com / Fonio at the backend):
+
+- Cal.com → `https://jericho.artemy.dev/api/webhooks/calcom`
+- Fonio → `https://jericho.artemy.dev/api/webhooks/fonio`
+
+The backend allows cross-origin requests from the Vercel app (`cors: *`).
+
+---
+
+## Getting started (local development)
+
+Use this only if you want to run or change the code on your machine. The live app does not require local setup.
 
 ### Prerequisites
 
@@ -65,7 +90,7 @@ cd ../frontend && npm install
 # npx ts-node seed.ts
 ```
 
-### Run
+### Run locally
 
 ```bash
 # Terminal 1 — backend (from backend/)
@@ -75,7 +100,7 @@ npm run dev
 npm run dev
 ```
 
-Then open `http://localhost:5173` in your browser.
+Then open `http://localhost:5173`. Local frontend uses `VITE_API_URL=http://localhost:3001/api` from `frontend/.env`.
 
 ---
 
@@ -104,7 +129,7 @@ Jericho/
 | Variable | Description |
 |---|---|
 | `PORT` | API port (default `3001`) |
-| `FRONTEND_URL` | Allowed CORS origin (default `http://localhost:5173`) |
+| `FRONTEND_URL` | Allowed CORS origin for local dev (production backend uses `cors: *`) |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Path to Firebase service account JSON (default `./service-account.json`) |
 | `FONIO_API_KEY` | Fonio API key |
 | `FONIO_AGENT_ID` | Fonio voice agent ID |
@@ -116,7 +141,7 @@ Jericho/
 | `CAL_BASE_URL` | Cal.com API base URL (default `https://api.cal.com`) |
 | `ANTHROPIC_API_KEY` | Anthropic API key for candidate ranking |
 
-**Frontend (`frontend/.env`)** — see [`frontend/.env.example`](frontend/.env.example).
+**Frontend (`frontend/.env`)** — see [`frontend/.env.example`](frontend/.env.example). On Vercel, set `VITE_API_URL=https://jericho.artemy.dev/api` plus all `VITE_FIREBASE_*` keys.
 
 ## Architecture & assumptions
 
@@ -130,7 +155,8 @@ return webhooks to in-flight calls by phone number.
 
 ## Troubleshooting
 
-- Recovery job never starts → confirm Cal.com cancellation webhooks reach `/api/webhooks/calcom` and the cancelled appointment exists in Firestore
+- **Live app shows no data** → confirm Vercel `VITE_API_URL` is `https://jericho.artemy.dev/api` and the backend at https://jericho.artemy.dev is running
+- Recovery job never starts → confirm Cal.com webhooks reach `https://jericho.artemy.dev/api/webhooks/calcom`
 - Fonio outcome not processed → ensure the call attempt was created before the webhook arrives; matching uses `customerPhone` and `INITIATED` status
 - Backend fails on startup → check that `service-account.json` exists at the path set in `FIREBASE_SERVICE_ACCOUNT_PATH`
 
