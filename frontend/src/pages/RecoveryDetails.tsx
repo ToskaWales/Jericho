@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -11,6 +11,9 @@ import { CallAttemptItem } from '@/components/recovery/CallAttemptItem';
 import { RecoveryTimeline } from '@/components/recovery/RecoveryTimeline';
 import { useRecoveryJobRealtime, useCallAttemptsRealtime, useEscalateJob } from '@/hooks/useRecoveryJobs';
 import { formatDateTime, formatRelative, formatCurrency } from '@/lib/utils';
+import type { RecoveryJobStatus } from '@/types';
+
+const FINISHED_STATUSES: RecoveryJobStatus[] = ['SUCCESS', 'FAILED', 'ESCALATED'];
 
 export default function RecoveryDetails() {
   const { id } = useParams<{ id: string }>();
@@ -45,6 +48,9 @@ export default function RecoveryDetails() {
   }
 
   const isActive = job.status === 'PENDING' || job.status === 'IN_PROGRESS';
+  const isFinished = FINISHED_STATUSES.includes(job.status);
+  const completedAttempts = callAttempts.filter((a) => a.status === 'COMPLETED');
+  const hasTranscripts = completedAttempts.some((a) => !!a.transcript?.trim());
 
   return (
     <div className="space-y-6">
@@ -113,6 +119,31 @@ export default function RecoveryDetails() {
             </CardContent>
           </Card>
 
+          {isFinished && completedAttempts.length > 0 && (
+            <Card id="transcripts">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                  Call Transcripts
+                </CardTitle>
+                {!hasTranscripts && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Call attempts were recorded, but no transcripts are available.
+                  </p>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-3 p-4 pt-0">
+                {completedAttempts.map((attempt) => (
+                  <CallAttemptItem
+                    key={attempt.id}
+                    attempt={attempt}
+                    alwaysShowTranscript
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -135,7 +166,7 @@ export default function RecoveryDetails() {
             </CardContent>
           </Card>
 
-          {callAttempts.length > 0 && (
+          {!isFinished && callAttempts.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle>Call Attempts</CardTitle>

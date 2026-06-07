@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle, Clock } from 'lucide-react';
+import { ArrowRight, CheckCircle, Clock, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -57,7 +57,7 @@ export default function Dashboard() {
               {recentCompleted.map((job) => (
                 <Link
                   key={job.id}
-                  to={`/recovery-jobs/${job.id}`}
+                  to={`/recovery-jobs/${job.id}#transcripts`}
                   className="flex items-center justify-between px-6 py-3 hover:bg-muted/30 transition-colors"
                 >
                   <div>
@@ -73,6 +73,11 @@ export default function Dashboard() {
                     </div>
                     <p className="text-xs text-muted-foreground pl-5 mt-0.5">
                       {formatRelative(job.createdAt)} · {job.candidates.length} candidates ranked
+                      {job.totalAttempts > 0 && (
+                        <span className="inline-flex items-center gap-1 ml-1 text-primary/80">
+                          · <MessageSquare className="h-3 w-3" /> View transcript
+                        </span>
+                      )}
                     </p>
                   </div>
                   <Badge variant={getJobStatusColor(job.status) as any}>

@@ -1,4 +1,5 @@
 import { col, now, toIso } from '../lib/firebase';
+import { resolveTranscript } from '../lib/formatTranscript';
 import { initiateCall } from './initiateCall';
 import { createCalcomBooking } from './createCalcomBooking';
 import { cancelCalcomBooking } from './cancelCalcomBooking';
@@ -15,6 +16,7 @@ export interface FonioWebhookPayload {
   disconnectReason?: string | null;
   summary?: string;
   formattedTranscript?: string;
+  transcript?: unknown[];
   extractionData: {
     callOutcome: CallOutcome;
     callbackRequested?: boolean | null;
@@ -86,6 +88,11 @@ export async function processOutcome(webhook: FonioWebhookPayload): Promise<void
   const attempt = attemptDoc.data()!;
   console.log(`${ts()} [processOutcome] Attempt matched — attemptId=${attemptDoc.id} recoveryJobId=${attempt.recoveryJobId} customer="${attempt.customerName}" appointmentId=${attempt.appointmentId}`);
 
+  const transcript = resolveTranscript(webhook);
+  if (!transcript) {
+    console.warn(`${ts()} [processOutcome] No transcript in webhook — formattedTranscript and transcript[] both empty`);
+  }
+
   // ── Update call attempt ─────────────────────────────────────────────────────
   await attemptDoc.ref.update({
     status: 'COMPLETED',
@@ -95,10 +102,10 @@ export async function processOutcome(webhook: FonioWebhookPayload): Promise<void
     declineReason: extractionData.declineReason ?? null,
     customerResponse: extractionData.customerResponse ?? null,
     callbackTime: extractionData.callbackTime ?? null,
-    transcript: webhook.formattedTranscript ?? null,
+    transcript,
     duration: webhook.duration ?? null,
   });
-  console.log(`${ts()} [processOutcome] Attempt doc marked COMPLETED (duration=${webhook.duration ?? '?'}s transcript=${webhook.formattedTranscript ? 'yes' : 'none'})`);
+  console.log(`${ts()} [processOutcome] Attempt doc marked COMPLETED (duration=${webhook.duration ?? '?'}s transcript=${transcript ? 'yes' : 'none'})`);
 
   // ── Load recovery job ───────────────────────────────────────────────────────
   const jobDoc = await col.recoveryJobs.doc(attempt.recoveryJobId).get();

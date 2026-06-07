@@ -148,6 +148,9 @@ export interface CallAttempt {
   duration?: number;
   callbackScheduledAt?: string;
   errorMessage?: string;
+  transcript?: string | null;
+  declineReason?: string | null;
+  customerResponse?: string | null;
 }
 
 export interface Settings {

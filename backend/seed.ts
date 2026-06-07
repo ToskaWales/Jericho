@@ -324,6 +324,126 @@ async function main() {
   await batch3.commit();
   console.log('✓ waitlist');
 
+  // ── Recovery jobs & call attempts (demo transcripts) ───────────────────────
+  const batch4 = db.batch();
+
+  const JOB = { success: 'job-success', failed: 'job-failed' };
+
+  const sophieTranscript =
+    'Agent: Hello, may I please speak with Sophie Müller?\n' +
+    'Customer: Yes, speaking. Who is this?\n' +
+    'Agent: Hi Sophie, this is Jericho Dental calling. A cleaning appointment on July 8th at 10 AM has just opened up. Would that work for you?\n' +
+    'Customer: Oh, July 8th at ten? Yes, that works perfectly — I was hoping something would come up sooner.\n' +
+    'Agent: Wonderful! I will confirm that booking for you right now.\n' +
+    'Customer: Perfect, thank you so much. See you then!';
+
+  batch4.set(ref('recoveryJobs', JOB.success), {
+    appointmentId: 'appt-cancelled-1',
+    appointmentTypeId: TYPE.cleaning,
+    appointmentTypeName: 'Professional Cleaning',
+    locationId: LOC,
+    locationName: 'Jericho Dental — Vienna Central',
+    slotTime: ts('2026-07-08T10:00:00Z'),
+    status: 'SUCCESS',
+    currentCandidateIndex: 0,
+    candidates: [
+      {
+        customerId: CUST.sophie, customerName: 'Sophie Müller', customerPhone: '+491632421661',
+        score: 92, reachabilityScore: 85, aiRankingReason: 'Strong match — wants earlier cleaning slot',
+        originalAppointmentId: 'appt-sophie-booked', status: 'ACCEPTED', retryCount: 0,
+        callAttemptIds: ['ca-success-1'], contactedAt: ts('2026-07-01T09:05:00Z'),
+      },
+      {
+        customerId: CUST.hans, customerName: 'Hans Bauer', customerPhone: '+491632421661',
+        score: 71, reachabilityScore: 60, aiRankingReason: 'Secondary candidate',
+        originalAppointmentId: 'appt-hans-booked', status: 'PENDING', retryCount: 0,
+        callAttemptIds: [],
+      },
+    ],
+    totalAttempts: 1,
+    price: 120,
+    winnerCustomerId: CUST.sophie,
+    winnerCustomerName: 'Sophie Müller',
+    createdAt: ts('2026-07-01T09:00:00Z'),
+    updatedAt: ts('2026-07-01T09:12:00Z'),
+    completedAt: ts('2026-07-01T09:12:00Z'),
+  });
+
+  batch4.set(ref('recoveryJobs', JOB.failed), {
+    appointmentId: 'appt-cancelled-2',
+    appointmentTypeId: TYPE.checkup,
+    appointmentTypeName: 'Comprehensive Checkup',
+    locationId: LOC,
+    locationName: 'Jericho Dental — Vienna Central',
+    slotTime: ts('2026-07-14T09:00:00Z'),
+    status: 'FAILED',
+    currentCandidateIndex: 1,
+    candidates: [
+      {
+        customerId: CUST.elisabeth, customerName: 'Elisabeth Wagner', customerPhone: '+491632421661',
+        score: 88, reachabilityScore: 70, aiRankingReason: 'Top candidate for checkup slot',
+        originalAppointmentId: 'appt-elisabeth-booked', status: 'NO_ANSWER', retryCount: 2,
+        callAttemptIds: ['ca-failed-1', 'ca-failed-2'], contactedAt: ts('2026-07-05T11:30:00Z'),
+      },
+      {
+        customerId: CUST.thomas, customerName: 'Thomas Gruber', customerPhone: '+491632421661',
+        score: 79, reachabilityScore: 65, aiRankingReason: 'Second candidate',
+        originalAppointmentId: 'appt-thomas-booked', status: 'DECLINED', retryCount: 1,
+        callAttemptIds: ['ca-failed-3'], contactedAt: ts('2026-07-05T12:00:00Z'),
+      },
+    ],
+    totalAttempts: 3,
+    price: 150,
+    createdAt: ts('2026-07-05T11:00:00Z'),
+    updatedAt: ts('2026-07-05T12:15:00Z'),
+    completedAt: ts('2026-07-05T12:15:00Z'),
+  });
+
+  batch4.set(ref('callAttempts', 'ca-success-1'), {
+    recoveryJobId: JOB.success, customerId: CUST.sophie,
+    customerName: 'Sophie Müller', customerPhone: '+491632421661',
+    appointmentId: 'appt-cancelled-1', fonioCallId: 'fonio-demo-1',
+    status: 'COMPLETED', outcome: 'ACCEPTED', attemptNumber: 1,
+    initiatedAt: ts('2026-07-01T09:05:00Z'), completedAt: ts('2026-07-01T09:12:00Z'),
+    duration: 142, transcript: sophieTranscript,
+  });
+
+  batch4.set(ref('callAttempts', 'ca-failed-1'), {
+    recoveryJobId: JOB.failed, customerId: CUST.elisabeth,
+    customerName: 'Elisabeth Wagner', customerPhone: '+491632421661',
+    appointmentId: 'appt-cancelled-2', fonioCallId: 'fonio-demo-2',
+    status: 'COMPLETED', outcome: 'NO_ANSWER', attemptNumber: 1,
+    initiatedAt: ts('2026-07-05T11:30:00Z'), completedAt: ts('2026-07-05T11:31:00Z'),
+    duration: 28, transcript: null,
+  });
+
+  batch4.set(ref('callAttempts', 'ca-failed-2'), {
+    recoveryJobId: JOB.failed, customerId: CUST.elisabeth,
+    customerName: 'Elisabeth Wagner', customerPhone: '+491632421661',
+    appointmentId: 'appt-cancelled-2', fonioCallId: 'fonio-demo-3',
+    status: 'COMPLETED', outcome: 'NO_ANSWER', attemptNumber: 2,
+    initiatedAt: ts('2026-07-05T11:45:00Z'), completedAt: ts('2026-07-05T11:46:00Z'),
+    duration: 30, transcript: null,
+  });
+
+  const thomasDeclineTranscript =
+    'Agent: Hi Thomas, this is Jericho Dental. We have a checkup slot available on July 14th at 9 AM. Would you like to take it?\n' +
+    'Customer: Thanks, but I cannot make that date. Please keep my current appointment.\n' +
+    'Agent: No problem at all. Have a great day!';
+
+  batch4.set(ref('callAttempts', 'ca-failed-3'), {
+    recoveryJobId: JOB.failed, customerId: CUST.thomas,
+    customerName: 'Thomas Gruber', customerPhone: '+491632421661',
+    appointmentId: 'appt-cancelled-2', fonioCallId: 'fonio-demo-4',
+    status: 'COMPLETED', outcome: 'DECLINED', attemptNumber: 1,
+    initiatedAt: ts('2026-07-05T12:00:00Z'), completedAt: ts('2026-07-05T12:06:00Z'),
+    duration: 95, transcript: thomasDeclineTranscript,
+    declineReason: 'Cannot make that date',
+  });
+
+  await batch4.commit();
+  console.log('✓ recovery jobs & call attempts');
+
   console.log('\n✅ Seed complete!\n');
   console.log('Summary:');
   console.log('  1  location');
@@ -331,6 +451,8 @@ async function main() {
   console.log('  8  customers');
   console.log(' 15  appointments (2 cancelled, 8 booked, 5 historical)');
   console.log('  3  waitlist entries');
+  console.log('  2  recovery jobs (1 SUCCESS with transcript, 1 FAILED with mixed attempts)');
+  console.log('  4  call attempts (2 with transcripts, 2 without)');
   console.log('  1  settings doc');
 }
 
